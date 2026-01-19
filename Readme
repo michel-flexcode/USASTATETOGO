@@ -1,0 +1,24 @@
+carte.py ancien systéme basique pour proto
+data.csv archaique BDD
+
+USAMapProject/
+│
+├── data/
+│   └── usa.db
+│
+├── scripts/
+│   ├── create_db.py
+│   └── insert_data.py
+│
+├── app/
+│   └── map_app.py
+│
+├── requirements.txt
+└── README.md
+
+
+cd USAMapProject
+
+python3 scripts/create_db.py
+python3 scripts/insert_data.py
+python3 app/map_app.py
