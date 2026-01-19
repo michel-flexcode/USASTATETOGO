@@ -5,125 +5,108 @@ import sqlite3
 
 DB_PATH = "data/usa.db"
 
-
-def load_global_filters():
+def load_data():
     conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query(
-        "SELECT id, name, label FROM filters WHERE parent_id IS NULL", conn
-    )
+    df = pd.read_sql_query("SELECT * FROM states", conn)
     conn.close()
     return df
 
-
-def load_subfilters(parent_id):
+def load_filters():
     conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query(
-        "SELECT id, name, label FROM filters WHERE parent_id = ?", conn, params=(parent_id,)
-    )
+    df = pd.read_sql_query("SELECT * FROM filters", conn)
     conn.close()
     return df
 
+def load_state_filters():
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("""
+        SELECT sf.state_code, f.category, f.name
+        FROM state_filters sf
+        JOIN filters f ON sf.filter_id = f.id
+    """, conn)
+    conn.close()
+    return df
 
-df_globals = load_global_filters()
+df_states = load_data()
+df_filters = load_filters()
+df_state_filters = load_state_filters()
 
 app = Dash(__name__)
 
-app.layout = html.Div([
-    html.H1("USA Map – Multi Filters"),
+# global filters (parent_id IS NULL)
+global_filters = df_filters[df_filters["parent_id"].isnull()]
 
-    # 1) Global filters (checkbox)
+app.layout = html.Div([
+    html.H1("USA Map - Multi Filters (DB)"),
+
     dcc.Checklist(
         id="global-filters",
-        options=[{"label": r["label"], "value": r["id"]} for _, r in df_globals.iterrows()],
+        options=[{"label": r["label"], "value": r["name"]} for _, r in global_filters.iterrows()],
         value=[]
     ),
 
-    # 2) Subfilters container (one dropdown per selected global filter)
-    html.Div(id="subfilters-container"),
-
-    # 3) Map
-    dcc.Graph(id="usa-map")
+    html.Div(id="subfilter-container"),
+    dcc.Graph(id="usa-map"),
 ])
 
 
-# -----------------------
-# Create one dropdown per global filter (optional)
-# -----------------------
 @app.callback(
-    Output("subfilters-container", "children"),
+    Output("subfilter-container", "children"),
     Input("global-filters", "value")
 )
-def create_subfilters(global_ids):
+def render_subfilters(active_globals):
     children = []
+    for g in active_globals:
+        parent = global_filters[global_filters["name"] == g].iloc[0]
+        children_rows = df_filters[df_filters["parent_id"] == parent["id"]]
 
-    for gid in global_ids:
-        df_sub = load_subfilters(gid)
-
-        # if no subfilters exist, don't show dropdown
-        if df_sub.empty:
-            continue
-
-        children.append(
-            html.Div([
-                html.H4(f"Subfilters for {df_globals[df_globals.id == gid].iloc[0]['label']}"),
-                dcc.Dropdown(
-                    id={"type": "subfilter-dropdown", "index": gid},
-                    options=[{"label": r["label"], "value": r["id"]} for _, r in df_sub.iterrows()],
-                    multi=True,
-                    placeholder="Select subfilters..."
+        if not children_rows.empty:
+            children.append(html.Div([
+                html.Label(f"Subfilters for {parent['label']}"),
+                dcc.Checklist(
+                    id={"type": "subfilters", "index": g},
+                    options=[{"label": r["label"], "value": r["name"]} for _, r in children_rows.iterrows()],
+                    value=[]
                 )
-            ])
-        )
-
+            ]))
     return children
 
 
-# -----------------------
-# Map update with global + optional subfilters
-# -----------------------
 @app.callback(
     Output("usa-map", "figure"),
     Input("global-filters", "value"),
-    Input({"type": "subfilter-dropdown", "index": ALL}, "value")
+    Input({"type": "subfilters", "index": ALL}, "value")
 )
-def update_map(global_ids, sub_values):
-    sub_ids = [item for sub in sub_values if sub for item in sub]
+def update_map(active_globals, subfilter_values):
+    filtered = df_states.copy()
 
-    conn = sqlite3.connect(DB_PATH)
+    # 1) global filters only (no subfilters)
+    if active_globals and not any(subfilter_values):
+        # keep states that match at least one subfilter of each global
+        for g in active_globals:
+            parent = global_filters[global_filters["name"] == g].iloc[0]
+            child_names = df_filters[df_filters["parent_id"] == parent["id"]]["name"].tolist()
+            state_codes = df_state_filters[df_state_filters["name"].isin(child_names)]["state_code"].unique()
+            filtered = filtered[filtered["code"].isin(state_codes)]
 
-    query = """
-        SELECT s.code, s.name
-        FROM states s
-        JOIN state_filters sf ON sf.state_code = s.code
-    """
+    # 2) subfilters selected (AND logic)
+    if any(subfilter_values):
+        # subfilter_values is a list of lists
+        for sublist in subfilter_values:
+            for sf in sublist:
+                state_codes = df_state_filters[df_state_filters["name"] == sf]["state_code"].unique()
+                filtered = filtered[filtered["code"].isin(state_codes)]
 
-    params = []
-    conditions = []
-
-    # Global filter condition
-    if global_ids:
-        conditions.append(f"sf.filter_id IN ({','.join('?'*len(global_ids))})")
-        params.extend(global_ids)
-
-    # Subfilter condition
-    if sub_ids:
-        conditions.append(f"sf.filter_id IN ({','.join('?'*len(sub_ids))})")
-        params.extend(sub_ids)
-
-    if conditions:
-        query += " WHERE " + " OR ".join(conditions)
-
-    query += " GROUP BY s.code"
-
-    df = pd.read_sql_query(query, conn, params=params)
-    conn.close()
+    # If empty, keep all and show message
+    if filtered.empty:
+        filtered = df_states.copy()
 
     fig = px.choropleth(
-        df,
+        filtered,
         locations="code",
         locationmode="USA-states",
-        scope="usa",
-        hover_name="name"
+        color="name",
+        scope="usa"
     )
     return fig
 
