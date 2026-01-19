@@ -22,3 +22,28 @@ cd USAMapProject
 python3 scripts/create_db.py
 python3 scripts/insert_data.py
 python3 app/map_app.py
+
+
+1) Global filter (for guns or taxes):
+
+Pro
+
+Anti
+
+2) Advanced dropdown for guns:
+
+open carry
+
+permit
+
+background checks
+
+assault weapon ban
+
+etc.
+
+3) Political bias indicator:
+
+The more left filters selected → fade in Soviet flag
+
+The more right filters selected → fade in American eagle / flag

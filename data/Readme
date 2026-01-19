@@ -2,3 +2,14 @@ Here all the sources are agregated
 
 Abortement
 https://states.guttmacher.org/policies?bans=total-abortion-ban%2C6-week-ban
+
+
+states
+ └── code (PK)
+
+filters
+ └── id (PK)
+
+state_filters
+ ├── state_code → states.code
+ └── filter_id → filters.id

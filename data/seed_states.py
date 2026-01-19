@@ -1,0 +1,75 @@
+import sqlite3
+
+conn = sqlite3.connect("data/usa.db")
+c = conn.cursor()
+
+# Create states table
+c.execute("""
+CREATE TABLE IF NOT EXISTS states (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL
+)
+""")
+
+states = [
+    ("AL", "Alabama"),
+    ("AK", "Alaska"),
+    ("AZ", "Arizona"),
+    ("AR", "Arkansas"),
+    ("CA", "California"),
+    ("CO", "Colorado"),
+    ("CT", "Connecticut"),
+    ("DE", "Delaware"),
+    ("FL", "Florida"),
+    ("GA", "Georgia"),
+    ("HI", "Hawaii"),
+    ("ID", "Idaho"),
+    ("IL", "Illinois"),
+    ("IN", "Indiana"),
+    ("IA", "Iowa"),
+    ("KS", "Kansas"),
+    ("KY", "Kentucky"),
+    ("LA", "Louisiana"),
+    ("ME", "Maine"),
+    ("MD", "Maryland"),
+    ("MA", "Massachusetts"),
+    ("MI", "Michigan"),
+    ("MN", "Minnesota"),
+    ("MS", "Mississippi"),
+    ("MO", "Missouri"),
+    ("MT", "Montana"),
+    ("NE", "Nebraska"),
+    ("NV", "Nevada"),
+    ("NH", "New Hampshire"),
+    ("NJ", "New Jersey"),
+    ("NM", "New Mexico"),
+    ("NY", "New York"),
+    ("NC", "North Carolina"),
+    ("ND", "North Dakota"),
+    ("OH", "Ohio"),
+    ("OK", "Oklahoma"),
+    ("OR", "Oregon"),
+    ("PA", "Pennsylvania"),
+    ("RI", "Rhode Island"),
+    ("SC", "South Carolina"),
+    ("SD", "South Dakota"),
+    ("TN", "Tennessee"),
+    ("TX", "Texas"),
+    ("UT", "Utah"),
+    ("VT", "Vermont"),
+    ("VA", "Virginia"),
+    ("WA", "Washington"),
+    ("WV", "West Virginia"),
+    ("WI", "Wisconsin"),
+    ("WY", "Wyoming"),
+]
+
+c.executemany("""
+INSERT OR IGNORE INTO states (code, name)
+VALUES (?, ?)
+""", states)
+
+conn.commit()
+conn.close()
+
+print("✅ States seeded successfully")
